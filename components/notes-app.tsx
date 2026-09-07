@@ -43,6 +43,7 @@ export default function NotesApp() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const activeModel = models.find((model) => model.id === activeModelId) ?? models[0];
@@ -98,13 +99,18 @@ export default function NotesApp() {
 
   async function capture(content: string) {
     if (!content.trim() || !supabase || !user || !activeModel) return;
-    setSaving(true); setMessage("");
+    const log = (entry: string) => setDebugLog((current) => [...current.slice(-5), `${new Date().toLocaleTimeString()} — ${entry}`]);
+    setSaving(true); setMessage(""); log("salvando captura");
     const { data, error } = await supabase.from("notes").insert({ user_id: user.id, model_id: activeModel.id, original_content: content.trim(), ai_status: "pending" }).select().single();
-    if (error) { setMessage(error.message); setSaving(false); return; }
-    const note = data as Note; setMessage("Interpretando e separando suas tarefas..."); if (inputRef.current) inputRef.current.value = "";
-    fetch("/api/ai/parse", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ modelName: activeModel.name, context: activeModel.description ?? "", fields: activeModel.enabled_fields, content, aiModel }) }).then(async (response) => {
-      if (!response.ok) throw new Error("AI indisponível"); const result = await response.json();
+    if (error) { setMessage(error.message); log(`erro ao salvar: ${error.message}`); setSaving(false); return; }
+    const note = data as Note; setMessage("Interpretando e separando suas tarefas..."); log(`captura salva (${note.id.slice(0, 8)})`); if (inputRef.current) inputRef.current.value = "";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45000);
+    log(`enviando para Gemini (${aiModel})`);
+    fetch("/api/ai/parse", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ modelName: activeModel.name, context: activeModel.description ?? "", fields: activeModel.enabled_fields, content, aiModel }) }).then(async (response) => {
+      if (!response.ok) throw new Error(`Gemini respondeu HTTP ${response.status}`); const result = await response.json();
       const parsedNotes = Array.isArray(result) ? result : Array.isArray(result.notes) ? result.notes : [result];
+      log(`Gemini respondeu com ${parsedNotes.length} tarefa(s)`);
       const first = parsedNotes[0];
       const update: Partial<Note> = { title: first.title, description: first.description, note_date: first.date || null, tags: first.tags ?? [], value: first.value, number_value: first.number, status: first.status, ai_status: "complete", ai_metadata: { provider: "gemini", split_count: parsedNotes.length } };
       await supabase.from("notes").update(update).eq("id", note.id);
@@ -112,8 +118,9 @@ export default function NotesApp() {
       const inserted = additional.length ? await supabase.from("notes").insert(additional).select() : { data: [] as Note[] };
       const completed = { ...note, ...update };
       setNotes((current) => [...(inserted.data as Note[] ?? []), completed, ...current]);
-      if (parsedNotes.length > 1) setMessage(`${parsedNotes.length} tarefas criadas a partir do seu texto.`);
-    }).catch(async () => { await supabase.from("notes").update({ ai_status: "failed" }).eq("id", note.id); setNotes((current) => [{ ...note, ai_status: "failed" }, ...current]); setMessage("Texto salvo. A interpretação por IA falhou, mas nada foi perdido."); }).finally(() => setSaving(false));
+      log(`salvas ${parsedNotes.length} tarefa(s)`);
+      setMessage(`${parsedNotes.length} tarefa${parsedNotes.length === 1 ? "" : "s"} criada${parsedNotes.length === 1 ? "" : "s"}.`);
+    }).catch(async (error: unknown) => { const detail = error instanceof DOMException && error.name === "AbortError" ? "timeout após 45s" : error instanceof Error ? error.message : "erro desconhecido"; await supabase.from("notes").update({ ai_status: "failed" }).eq("id", note.id); setNotes((current) => [{ ...note, ai_status: "failed" }, ...current]); log(`falha: ${detail}`); setMessage(`Texto salvo, mas a IA falhou: ${detail}.`); }).finally(() => { window.clearTimeout(timeout); setSaving(false); });
   }
 
   async function saveModel(form: NoteModel) {
@@ -173,8 +180,9 @@ export default function NotesApp() {
         {!activeModel ? <EmptyModels onCreate={() => setShowModelEditor(true)} /> : <>
           <form className="capture-form" onSubmit={(event) => { event.preventDefault(); void capture(inputRef.current?.value ?? ""); }}>
             <textarea ref={inputRef} autoFocus rows={3} placeholder={activeModel.placeholders?.[0] ?? DEFAULT_PLACEHOLDERS[0]} aria-label={`Capture a note in ${activeModel.name}`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
-            <div className="capture-hint"><span>shift + enter para uma nova linha</span><button className="save-button" disabled={saving} type="submit">{saving ? "Salvando" : "Salvar"}<span>↵</span></button></div>
+            <div className="capture-hint"><span>shift + enter para uma nova linha</span><button className="save-button" disabled={saving} type="submit">{saving ? "Interpretando..." : "Salvar"}<span>↵</span></button></div>
           </form>
+          {debugLog.length > 0 && <div className="debug-log" aria-live="polite"><span className="debug-label">DEV / IA</span>{debugLog.map((entry, index) => <div key={`${entry}-${index}`}>{entry}</div>)}</div>}
           <NoteFeed notes={visibleNotes.slice(0, 12)} models={models} onSelect={setSelectedNote} onOpenHistory={() => setView("history")} />
         </>}
       </>}

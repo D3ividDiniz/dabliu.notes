@@ -31,6 +31,8 @@ h2 { font-size: 13px; font-weight: 500; }
 .capture-form textarea { border: 0; background: transparent; padding: 0; font-size: clamp(19px, 3vw, 24px); line-height: 1.55; min-height: 115px; border-radius: 0; letter-spacing: -.04em; }
 .capture-form textarea::placeholder { color: var(--muted); opacity: .75; }
 .capture-hint { color: var(--muted); font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
+.debug-log { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--line); color: var(--muted); font-size: 10px; line-height: 1.7; background: color-mix(in srgb, var(--panel), transparent 35%); }
+.debug-label { display: block; color: var(--model-color); font-size: 9px; letter-spacing: .12em; margin-bottom: 3px; }
 .save-button, .primary-button, .google-button { border: 0; border-radius: 5px; background: var(--text); color: var(--bg); padding: 9px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .save-button { padding: 6px 9px; background: transparent; color: var(--text); }
 .save-button:hover { background: var(--soft); }
