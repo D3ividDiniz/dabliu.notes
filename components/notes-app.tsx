@@ -104,7 +104,7 @@ export default function NotesApp() {
     const note = data as Note; setMessage("Interpretando e separando suas tarefas..."); if (inputRef.current) inputRef.current.value = "";
     fetch("/api/ai/parse", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ modelName: activeModel.name, context: activeModel.description ?? "", fields: activeModel.enabled_fields, content, aiModel }) }).then(async (response) => {
       if (!response.ok) throw new Error("AI indisponível"); const result = await response.json();
-      const parsedNotes = Array.isArray(result.notes) ? result.notes : [result];
+      const parsedNotes = Array.isArray(result) ? result : Array.isArray(result.notes) ? result.notes : [result];
       const first = parsedNotes[0];
       const update: Partial<Note> = { title: first.title, description: first.description, note_date: first.date || null, tags: first.tags ?? [], value: first.value, number_value: first.number, status: first.status, ai_status: "complete", ai_metadata: { provider: "gemini", split_count: parsedNotes.length } };
       await supabase.from("notes").update(update).eq("id", note.id);
