@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, BriefcaseBusiness, CircleDot, Command, Download, Film, FolderKanban, GraduationCap, Heart, House, Library, ListTodo, LogIn, LogOut, Plane, Plus, Search, Settings, ShoppingBag, Sparkles, Trash2, WalletCards, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { FIELD_LABELS, MODEL_COLORS, type FieldKey, type ModelColor, type Note, type NoteModel, type OrganizationMode, type SwipeBehavior, type ThemeMode, type VisualStyle } from "@/lib/types";
+import { FIELD_LABELS, MODEL_COLORS, type FieldKey, type FontFamily, type ModelColor, type Note, type NoteModel, type OrganizationMode, type SwipeBehavior, type ThemeMode, type VisualStyle } from "@/lib/types";
 
 const ICON_LIBRARY = [
   { value: "briefcase", label: "Trabalho", icon: BriefcaseBusiness },
@@ -27,6 +27,12 @@ const AI_MODELS = [
   { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
   { value: "gemini-flash-latest", label: "Gemini Flash (mais recente)" },
 ] as const;
+const FONT_OPTIONS: Array<{ value: FontFamily; label: string; sample: string }> = [
+  { value: "mono", label: "Mono", sample: "Clássica e técnica" },
+  { value: "sans", label: "Sans", sample: "Limpa e discreta" },
+  { value: "serif", label: "Serif", sample: "Editorial e calma" },
+  { value: "rounded", label: "Rounded", sample: "Leve e amigável" },
+];
 
 function IconGlyph({ name, size = 17 }: { name: string; size?: number }) {
   const option = ICON_LIBRARY.find((item) => item.value === name);
@@ -42,6 +48,20 @@ function formatNoteDate(value: string | null) {
 
 function normalizeNoteDate(value: unknown) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function getAIUsage(notes: Note[]) {
+  return notes.reduce((total, note) => {
+    const usage = note.ai_metadata?.usage;
+    if (!usage || typeof usage !== "object") return total;
+    const values = usage as Record<string, unknown>;
+    return {
+      requests: total.requests + 1,
+      prompt: total.prompt + (typeof values.promptTokenCount === "number" ? values.promptTokenCount : 0),
+      output: total.output + (typeof values.candidatesTokenCount === "number" ? values.candidatesTokenCount : 0),
+      total: total.total + (typeof values.totalTokenCount === "number" ? values.totalTokenCount : 0),
+    };
+  }, { requests: 0, prompt: 0, output: 0, total: 0 });
 }
 
 function groupLabel(value: string) {
@@ -66,6 +86,7 @@ export default function NotesApp() {
   const [editingModel, setEditingModel] = useState<NoteModel | null>(null);
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [visualStyle, setVisualStyle] = useState<VisualStyle>("minimal");
+  const [fontFamily, setFontFamily] = useState<FontFamily>("mono");
   const [aiModel, setAIModel] = useState("gemini-3.6-flash");
   const [swipeBehavior, setSwipeBehavior] = useState<SwipeBehavior>("archive");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
@@ -80,6 +101,7 @@ export default function NotesApp() {
   const activeModel = models.find((model) => model.id === activeModelId) ?? models[0];
   const visibleNotes = notes.filter((note) => !note.deleted_at && !note.archived_at && note.ai_status !== "pending" && (!activeModelId || view !== "capture" || note.model_id === activeModelId));
   const searchResults = notes.filter((note) => !note.deleted_at && !note.archived_at && note.ai_status !== "pending" && `${note.original_content} ${note.title ?? ""} ${note.description ?? ""} ${note.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()));
+  const aiUsage = useMemo(() => getAIUsage(notes), [notes]);
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
@@ -97,19 +119,20 @@ export default function NotesApp() {
     ]).then(([modelsResult, notesResult, preferencesResult]) => {
       if (modelsResult.data) { setModels(modelsResult.data as NoteModel[]); setActiveModelId((current) => current ?? modelsResult.data[0]?.id ?? null); }
       if (notesResult.data) setNotes(notesResult.data as Note[]);
-      if (preferencesResult.data) { setTheme(preferencesResult.data.theme); setVisualStyle(preferencesResult.data.visual_style); setAIModel(preferencesResult.data.ai_model ?? "gemini-3.6-flash"); setSwipeBehavior(preferencesResult.data.swipe_behavior ?? "archive"); }
+      if (preferencesResult.data) { setTheme(preferencesResult.data.theme); setVisualStyle(preferencesResult.data.visual_style); setFontFamily(preferencesResult.data.font_family ?? "mono"); setAIModel(preferencesResult.data.ai_model ?? "gemini-3.6-flash"); setSwipeBehavior(preferencesResult.data.swipe_behavior ?? "archive"); }
     });
   }, [supabase, user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.visual = activeModel?.visual_style ?? visualStyle;
-  }, [theme, visualStyle, activeModel?.visual_style]);
+    document.documentElement.dataset.font = fontFamily;
+  }, [theme, visualStyle, activeModel?.visual_style, fontFamily]);
 
   useEffect(() => {
     if (!supabase || !user) return;
-    void supabase.from("user_preferences").upsert({ user_id: user.id, theme, visual_style: visualStyle, ai_model: aiModel, swipe_behavior: swipeBehavior });
-  }, [supabase, user, theme, visualStyle, aiModel, swipeBehavior]);
+    void supabase.from("user_preferences").upsert({ user_id: user.id, theme, visual_style: visualStyle, font_family: fontFamily, ai_model: aiModel, swipe_behavior: swipeBehavior });
+  }, [supabase, user, theme, visualStyle, fontFamily, aiModel, swipeBehavior]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setView("search"); } };
@@ -142,9 +165,10 @@ export default function NotesApp() {
     fetch("/api/ai/parse", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ modelName: activeModel.name, context: activeModel.description ?? "", fields: activeModel.enabled_fields, content, aiModel }) }).then(async (response) => {
       if (!response.ok) throw new Error(`Gemini respondeu HTTP ${response.status}`); const result = await response.json();
       const parsedNotes = Array.isArray(result) ? result : Array.isArray(result.notes) ? result.notes : [result];
+      const usage = Array.isArray(result) ? null : result.usage ?? null;
       log(`Gemini respondeu com ${parsedNotes.length} tarefa(s)`);
       const first = parsedNotes[0];
-      const update: Partial<Note> = { title: first.title, description: first.description, note_date: normalizeNoteDate(first.date), tags: first.tags ?? [], value: first.value, number_value: first.number, status: first.status, ai_status: "complete", ai_metadata: { provider: "gemini", split_count: parsedNotes.length } };
+      const update: Partial<Note> = { title: first.title, description: first.description, note_date: normalizeNoteDate(first.date), tags: first.tags ?? [], value: first.value, number_value: first.number, status: first.status, ai_status: "complete", ai_metadata: { provider: "gemini", split_count: parsedNotes.length, usage } };
       const updateResult = await supabase.from("notes").update(update).eq("id", note.id);
       if (updateResult.error) throw updateResult.error;
       const additional = parsedNotes.slice(1).map((parsed: { title?: string | null; description?: string | null; date?: string | null; tags?: string[]; value?: number | null; number?: number | null; status?: Note["status"] }) => ({ user_id: user.id, model_id: activeModel.id, original_content: content.trim(), title: parsed.title ?? null, description: parsed.description ?? null, note_date: normalizeNoteDate(parsed.date), tags: parsed.tags ?? [], value: parsed.value ?? null, number_value: parsed.number ?? null, status: parsed.status ?? null, ai_status: "complete", ai_metadata: { provider: "gemini", split_count: parsedNotes.length } }));
@@ -169,7 +193,7 @@ export default function NotesApp() {
     if (!supabase || !window.confirm(`Excluir o módulo ${model.name}? As tarefas existentes serão preservadas.`)) return;
     // Keep notes recoverable by removing the model only after the user confirms. The DB restricts deletion while notes exist.
     const { error } = await supabase.from("models").delete().eq("id", model.id);
-    if (error) setMessage("Este módulo ainda tem tarefas. Exclua ou exporte essas tarefas primeiro."); else { setModels((current) => current.filter((item) => item.id !== model.id)); setActiveModelId(models.find((item) => item.id !== model.id)?.id ?? null); }
+    if (error) setMessage(error.message); else { setModels((current) => current.filter((item) => item.id !== model.id)); setActiveModelId((current) => current === model.id ? models.find((item) => item.id !== model.id)?.id ?? null : current); }
   }
 
   async function updateNote(note: Note, updates: Partial<Note>) {
@@ -231,7 +255,7 @@ export default function NotesApp() {
       </>}
       {view === "history" && <HistoryView notes={notes.filter((note) => !note.deleted_at && note.ai_status !== "pending")} models={models} onFilter={(id) => { setActiveModelId(id); }} onArchive={archiveNote} onDelete={deleteNote} onSelect={setSelectedNote} />}
       {view === "search" && <SearchView query={query} setQuery={setQuery} results={searchResults} models={models} onSelect={setSelectedNote} />}
-      {view === "settings" && <SettingsView theme={theme} setTheme={setTheme} visualStyle={visualStyle} setVisualStyle={setVisualStyle} aiModel={aiModel} setAIModel={setAIModel} swipeBehavior={swipeBehavior} setSwipeBehavior={setSwipeBehavior} models={models} onEdit={(model) => { setEditingModel(model); setShowModelEditor(true); }} onCreate={() => { setEditingModel(null); setShowModelEditor(true); }} onDelete={deleteModel} onExport={exportData} onSignOut={() => void supabase?.auth.signOut({ scope: "local" })} email={user.email} />}
+      {view === "settings" && <SettingsView theme={theme} setTheme={setTheme} visualStyle={visualStyle} setVisualStyle={setVisualStyle} fontFamily={fontFamily} setFontFamily={setFontFamily} aiModel={aiModel} setAIModel={setAIModel} aiUsage={aiUsage} swipeBehavior={swipeBehavior} setSwipeBehavior={setSwipeBehavior} models={models} onEdit={(model) => { setEditingModel(model); setShowModelEditor(true); }} onCreate={() => { setEditingModel(null); setShowModelEditor(true); }} onDelete={deleteModel} onExport={exportData} onSignOut={() => void supabase?.auth.signOut({ scope: "local" })} email={user.email} />}
     </section>
     {selectedNote && <NoteEditor note={selectedNote} model={models.find((item) => item.id === selectedNote.model_id)} onClose={() => setSelectedNote(null)} onSave={updateNote} onDelete={deleteNote} onArchive={archiveNote} />}
     {showModelEditor && <ModelEditor model={editingModel} onClose={() => { setShowModelEditor(false); setEditingModel(null); }} onSave={saveModel} />}
@@ -266,9 +290,9 @@ function NoteEditor({ note, model, onClose, onSave, onDelete, onArchive }: { not
 function ModelEditor({ model, onClose, onSave }: { model: NoteModel | null; onClose: () => void; onSave: (model: NoteModel) => void }) {
   const [form, setForm] = useState<NoteModel>(model ?? ({ id: "", user_id: "", name: "", icon: "dot", color: "blue", description: "", enabled_fields: ["title", "description", "date", "tag"], organization_mode: "list", placeholders: DEFAULT_PLACEHOLDERS, visual_style: "minimal", created_at: "", updated_at: "" } as NoteModel));
   const toggleField = (field: FieldKey) => setForm({ ...form, enabled_fields: form.enabled_fields.includes(field) ? form.enabled_fields.filter((item) => item !== field) : [...form.enabled_fields, field] });
-  return <div className="overlay"><section className="editor-panel model-panel" role="dialog" aria-modal="true" aria-label="Editor de módulo"><div className="panel-header"><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button><span>{model ? "Editar módulo" : "Novo módulo"}</span><button className="save-link" disabled={!form.name.trim()} onClick={() => onSave(form)}>Salvar</button></div><label>Nome<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Trabalho, Pessoal..." /></label><div className="form-grid"><label>Ícone<div className="icon-picker">{ICONS.map((icon) => <button type="button" aria-label={ICONS.find((item) => item === icon) ?? icon} className={form.icon === icon ? "picked" : ""} key={icon} onClick={() => setForm({ ...form, icon })}><IconGlyph name={icon} size={18} /></button>)}</div></label><label>Cor<div className="color-picker">{MODEL_COLORS.map((color) => <button type="button" key={color} className={`color-swatch color-${color} ${form.color === color ? "picked" : ""}`} onClick={() => setForm({ ...form, color: color as ModelColor })} aria-label={color} />)}</div></label></div><label>Descrição / contexto<textarea rows={3} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="O que pertence aqui? O que a IA deve saber?" /></label><fieldset><legend>Campos</legend><div className="check-grid">{Object.entries(FIELD_LABELS).map(([field, label]) => <label key={field} className="check-item"><input type="checkbox" checked={form.enabled_fields.includes(field as FieldKey)} onChange={() => toggleField(field as FieldKey)} /><span>{label}</span></label>)}</div></fieldset><label>Organização<select value={form.organization_mode} onChange={(e) => setForm({ ...form, organization_mode: e.target.value as OrganizationMode })}><option value="list">Lista</option><option value="date">Data</option><option value="tags">Tags</option></select></label><label>Placeholders <span className="muted">até 5</span>{form.placeholders.map((placeholder, index) => <input key={index} value={placeholder} onChange={(e) => setForm({ ...form, placeholders: form.placeholders.map((item, itemIndex) => itemIndex === index ? e.target.value : item) })} />)}{form.placeholders.length < 5 && <button className="text-button add-line" onClick={() => setForm({ ...form, placeholders: [...form.placeholders, ""] })}><Plus size={14} /> Adicionar placeholder</button>}</label><fieldset><legend>Estilo visual</legend><div className="segmented"><button type="button" className={form.visual_style === "minimal" ? "selected" : ""} onClick={() => setForm({ ...form, visual_style: "minimal" })}>Minimal</button><button type="button" className={form.visual_style === "ambient" ? "selected" : ""} onClick={() => setForm({ ...form, visual_style: "ambient" })}>Ambiente</button></div></fieldset></section></div>;
+  return <div className="overlay"><section className="editor-panel model-panel" role="dialog" aria-modal="true" aria-label="Editor de módulo"><div className="panel-header"><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button><span>{model ? "Editar módulo" : "Novo módulo"}</span><button className="save-link" disabled={!form.name.trim()} onClick={() => onSave(form)}>Salvar</button></div><label>Nome<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Trabalho, Pessoal..." /></label><div className="form-grid"><label>Ícone<div className="icon-picker">{ICONS.map((icon) => <button type="button" aria-label={ICONS.find((item) => item === icon) ?? icon} className={form.icon === icon ? "picked" : ""} key={icon} onClick={() => setForm({ ...form, icon })}><IconGlyph name={icon} size={18} /></button>)}</div></label><label>Cor<div className="color-picker">{MODEL_COLORS.map((color) => <button type="button" key={color} className={`color-swatch color-${color} ${form.color === color ? "picked" : ""}`} onClick={() => setForm({ ...form, color: color as ModelColor })} aria-label={color} />)}</div></label></div><label>Descrição / contexto<textarea rows={3} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="O que pertence aqui? O que a IA deve saber?" /></label><fieldset><legend>Campos</legend><div className="check-grid">{Object.entries(FIELD_LABELS).map(([field, label]) => <label key={field} className="check-item"><input type="checkbox" checked={form.enabled_fields.includes(field as FieldKey)} onChange={() => toggleField(field as FieldKey)} /><span>{label}</span></label>)}</div></fieldset><label>Organização<select value={form.organization_mode} onChange={(e) => setForm({ ...form, organization_mode: e.target.value as OrganizationMode })}><option value="list">Lista</option><option value="date">Data</option><option value="tags">Tags</option></select></label><label>Placeholders <span className="muted">até 5</span>{form.placeholders.map((placeholder, index) => <input key={index} value={placeholder} onChange={(e) => setForm({ ...form, placeholders: form.placeholders.map((item, itemIndex) => itemIndex === index ? e.target.value : item) })} />)}{form.placeholders.length < 5 && <button className="text-button add-line" onClick={() => setForm({ ...form, placeholders: [...form.placeholders, ""] })}><Plus size={14} /> Adicionar placeholder</button>}</label><fieldset><legend>Estilo visual</legend><div className="segmented"><button type="button" className={form.visual_style === "minimal" ? "selected" : ""} onClick={() => setForm({ ...form, visual_style: "minimal" })}>Minimalist</button><button type="button" className={form.visual_style === "ambient" ? "selected" : ""} onClick={() => setForm({ ...form, visual_style: "ambient" })}>Beauty</button></div></fieldset></section></div>;
 }
 
-function SettingsView({ theme, setTheme, visualStyle, setVisualStyle, aiModel, setAIModel, swipeBehavior, setSwipeBehavior, models, onEdit, onCreate, onDelete, onExport, onSignOut, email }: { theme: ThemeMode; setTheme: (theme: ThemeMode) => void; visualStyle: VisualStyle; setVisualStyle: (style: VisualStyle) => void; aiModel: string; setAIModel: (model: string) => void; swipeBehavior: SwipeBehavior; setSwipeBehavior: (behavior: SwipeBehavior) => void; models: NoteModel[]; onEdit: (model: NoteModel) => void; onCreate: () => void; onDelete: (model: NoteModel) => void; onExport: () => void; onSignOut: () => void; email?: string }) {
-  return <div className="view-panel settings-panel"><div className="view-heading"><div><p className="eyebrow">Simples de propósito</p><h1>Configurações</h1></div></div><div className="settings-section"><h2>Aparência</h2><div className="segmented full"><button className={theme === "system" ? "selected" : ""} onClick={() => setTheme("system")}>Sistema</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}>Claro</button><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}>Escuro</button></div><div className="segmented full"><button className={visualStyle === "minimal" ? "selected" : ""} onClick={() => setVisualStyle("minimal")}>Minimal</button><button className={visualStyle === "ambient" ? "selected" : ""} onClick={() => setVisualStyle("ambient")}>Ambiente</button></div></div><div className="settings-section"><h2>Inteligência artificial</h2><label>Modelo Gemini<select value={aiModel} onChange={(event) => setAIModel(event.target.value)}>{AI_MODELS.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}</select></label><p className="muted">A IA interpreta suas capturas no servidor. Sua chave nunca vai para o navegador.</p></div><div className="settings-section"><h2>Deslizar tarefas</h2><div className="segmented full"><button className={swipeBehavior === "archive" ? "selected" : ""} onClick={() => setSwipeBehavior("archive")}>Deslizar arquiva</button><button className={swipeBehavior === "reveal_delete" ? "selected" : ""} onClick={() => setSwipeBehavior("reveal_delete")}>Revelar ação</button></div><p className="muted">Arquivar remove da lista ativa, mas preserva a tarefa no histórico.</p></div><div className="settings-section"><div className="section-heading"><h2>Módulos</h2><button className="text-button" onClick={onCreate}><Plus size={14} /> Novo</button></div>{models.map((model) => <div className="model-setting" key={model.id}><span className={`note-icon color-${model.color}`}><IconGlyph name={model.icon} /></span><span>{model.name}</span><button className="text-button" onClick={() => onEdit(model)}>Editar</button><button className="icon-button quiet" onClick={() => onDelete(model)} aria-label={`Excluir ${model.name}`}><Trash2 size={15} /></button></div>)}</div><div className="settings-section"><h2>Dados</h2><button className="setting-action" onClick={onExport}><Download size={16} /> Exportar JSON</button></div><div className="settings-section account"><h2>Conta</h2><p className="muted">{email}</p><button className="setting-action" onClick={onSignOut}><LogOut size={16} /> Sair</button></div></div>;
+function SettingsView({ theme, setTheme, visualStyle, setVisualStyle, fontFamily, setFontFamily, aiModel, setAIModel, aiUsage, swipeBehavior, setSwipeBehavior, models, onEdit, onCreate, onDelete, onExport, onSignOut, email }: { theme: ThemeMode; setTheme: (theme: ThemeMode) => void; visualStyle: VisualStyle; setVisualStyle: (style: VisualStyle) => void; fontFamily: FontFamily; setFontFamily: (font: FontFamily) => void; aiModel: string; setAIModel: (model: string) => void; aiUsage: { requests: number; prompt: number; output: number; total: number }; swipeBehavior: SwipeBehavior; setSwipeBehavior: (behavior: SwipeBehavior) => void; models: NoteModel[]; onEdit: (model: NoteModel) => void; onCreate: () => void; onDelete: (model: NoteModel) => void; onExport: () => void; onSignOut: () => void; email?: string }) {
+  return <div className="view-panel settings-panel"><div className="view-heading"><div><p className="eyebrow">Simples de propósito</p><h1>Configurações</h1></div></div><div className="settings-section"><h2>Aparência</h2><div className="segmented full"><button className={theme === "system" ? "selected" : ""} onClick={() => setTheme("system")}>Sistema</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}>Claro</button><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}>Escuro</button></div><div className="segmented full"><button className={visualStyle === "minimal" ? "selected" : ""} onClick={() => setVisualStyle("minimal")}>Minimalist</button><button className={visualStyle === "ambient" ? "selected" : ""} onClick={() => setVisualStyle("ambient")}>Beauty</button></div></div><div className="settings-section"><h2>Fonte</h2><div className="font-options">{FONT_OPTIONS.map((font) => <button key={font.value} className={`font-option ${fontFamily === font.value ? "selected" : ""}`} onClick={() => setFontFamily(font.value)}><strong>{font.label}</strong><span>{font.sample}</span></button>)}</div></div><div className="settings-section"><h2>Inteligência artificial</h2><label>Modelo Gemini<select value={aiModel} onChange={(event) => setAIModel(event.target.value)}>{AI_MODELS.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}</select></label><div className="usage-card"><span className="eyebrow">Uso registrado</span><strong>{aiUsage.total.toLocaleString("pt-BR")} tokens</strong><span className="muted">{aiUsage.requests} captura{aiUsage.requests === 1 ? "" : "s"} processada{aiUsage.requests === 1 ? "" : "s"}. O custo exato depende da tabela atual do Google.</span></div><p className="muted">A IA interpreta suas capturas no servidor. Sua chave nunca vai para o navegador.</p></div><div className="settings-section"><h2>Deslizar tarefas</h2><div className="segmented full"><button className={swipeBehavior === "archive" ? "selected" : ""} onClick={() => setSwipeBehavior("archive")}>Deslizar arquiva</button><button className={swipeBehavior === "reveal_delete" ? "selected" : ""} onClick={() => setSwipeBehavior("reveal_delete")}>Revelar ação</button></div><p className="muted">Arquivar remove da lista ativa, mas preserva a tarefa no histórico.</p></div><div className="settings-section"><div className="section-heading"><h2>Módulos</h2><button className="text-button" onClick={onCreate}><Plus size={14} /> Novo</button></div>{models.map((model) => <div className="model-setting" key={model.id}><span className={`note-icon color-${model.color}`}><IconGlyph name={model.icon} /></span><span>{model.name}</span><button className="text-button" onClick={() => onEdit(model)}>Editar</button><button className="icon-button quiet" onClick={() => onDelete(model)} aria-label={`Excluir ${model.name}`}><Trash2 size={15} /></button></div>)}</div><div className="settings-section"><h2>Dados</h2><button className="setting-action" onClick={onExport}><Download size={16} /> Exportar JSON</button></div><div className="settings-section account"><h2>Conta</h2><p className="muted">{email}</p><button className="setting-action" onClick={onSignOut}><LogOut size={16} /> Sair</button></div></div>;
 }

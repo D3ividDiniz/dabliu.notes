@@ -18,7 +18,7 @@ create table if not exists public.models (
 create table if not exists public.notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  model_id uuid not null references public.models(id) on delete restrict,
+  model_id uuid references public.models(id) on delete set null,
   original_content text not null check (char_length(original_content) between 1 and 10000),
   title text,
   description text,
@@ -40,6 +40,7 @@ create table if not exists public.user_preferences (
   theme text not null default 'system' check (theme in ('system', 'light', 'dark')),
   visual_style text not null default 'minimal' check (visual_style in ('minimal', 'ambient')),
   swipe_behavior text not null default 'archive' check (swipe_behavior in ('archive', 'reveal_delete')),
+  font_family text not null default 'mono' check (font_family in ('mono', 'sans', 'serif', 'rounded')),
   ai_model text not null default 'gemini-3.6-flash',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

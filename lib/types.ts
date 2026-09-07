@@ -1,6 +1,7 @@
 export const MODEL_COLORS = ["yellow", "blue", "pink", "white", "gray"] as const;
 export type ModelColor = (typeof MODEL_COLORS)[number];
 export type VisualStyle = "minimal" | "ambient";
+export type FontFamily = "mono" | "sans" | "serif" | "rounded";
 export type OrganizationMode = "list" | "date" | "tags";
 export type FieldKey = "title" | "description" | "date" | "tag" | "value" | "number" | "status";
 export type ThemeMode = "system" | "light" | "dark";
@@ -24,7 +25,7 @@ export type NoteModel = {
 export type Note = {
   id: string;
   user_id: string;
-  model_id: string;
+  model_id: string | null;
   original_content: string;
   title: string | null;
   description: string | null;

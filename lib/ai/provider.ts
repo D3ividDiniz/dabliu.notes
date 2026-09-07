@@ -11,9 +11,11 @@ export const parsedNoteSchema = z.object({
 });
 
 export type ParsedNote = z.infer<typeof parsedNoteSchema>;
+export type AIUsage = { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+export type AIParseResult = { notes: ParsedNote[]; usage: AIUsage | null };
 
 export interface AIProvider {
-  parseNote(input: { modelName: string; context: string; fields: string[]; content: string; aiModel?: string }): Promise<ParsedNote[]>;
+  parseNote(input: { modelName: string; context: string; fields: string[]; content: string; aiModel?: string }): Promise<AIParseResult>;
 }
 
 export class GeminiProvider implements AIProvider {
@@ -40,10 +42,11 @@ If the user's text contains multiple tasks, reminders, requests, or distinct act
     if (typeof text !== "string") throw new Error("Gemini returned no text");
     const raw = JSON.parse(text);
     const rawNotes = Array.isArray(raw) ? raw : Array.isArray(raw.notes) ? raw.notes : [raw];
-    return rawNotes.slice(0, 20).map((item: Record<string, unknown>) => parsedNoteSchema.parse({
+    const notes = rawNotes.slice(0, 20).map((item: Record<string, unknown>) => parsedNoteSchema.parse({
       ...item,
       tags: item.tags ?? (Array.isArray(item.tag) ? item.tag : item.tag ? [item.tag] : []),
     }));
+    return { notes, usage: body?.usageMetadata ?? null };
   }
 }
 

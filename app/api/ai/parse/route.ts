@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const input = await request.json();
     console.info(`[ai] parse start model=${input.aiModel ?? "env-default"} chars=${String(input.content ?? "").length}`);
     const parsed = await provider.parseNote(input);
-    console.info(`[ai] parse success tasks=${parsed.length}`);
+    console.info(`[ai] parse success tasks=${parsed.notes.length} tokens=${parsed.usage?.totalTokenCount ?? "unknown"}`);
     return NextResponse.json(parsed);
   } catch (error) {
     console.error("[ai] parse failed", error instanceof Error ? error.message : "unknown error");

@@ -3,6 +3,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
 body { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 14px; }
+[data-font="sans"] body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+[data-font="serif"] body { font-family: Georgia, "Times New Roman", serif; }
+[data-font="rounded"] body { font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -79,6 +82,13 @@ h2 { font-size: 13px; font-weight: 500; }
 .model-setting { display: flex; align-items: center; gap: 11px; padding: 4px 0; }
 .model-setting span:nth-child(2) { flex: 1; }
 .setting-action { border: 0; background: transparent; padding: 0; justify-content: flex-start; display: flex; gap: 10px; align-items: center; font-size: 12px; }
+.font-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+.font-option { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 6px; padding: 11px; text-align: left; display: grid; gap: 5px; }
+.font-option strong { color: var(--text); font-size: 12px; font-weight: 500; }
+.font-option span { font-size: 10px; }
+.font-option.selected { border-color: var(--model-color); background: color-mix(in srgb, var(--model-color), transparent 88%); }
+.usage-card { display: grid; gap: 5px; border: 1px solid var(--line); border-left: 3px solid var(--model-color); padding: 12px; background: color-mix(in srgb, var(--panel), var(--model-color) 4%); }
+.usage-card strong { font-size: 18px; font-weight: 500; }
 .account { margin-top: 20px; }
 .danger-button { border: 1px solid #c86c74; color: #b13e47; background: transparent; border-radius: 5px; padding: 10px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; }
 .danger-button:hover { background: color-mix(in srgb, #b13e47, transparent 90%); }
@@ -94,11 +104,17 @@ h2 { font-size: 13px; font-weight: 500; }
 .color-picker { display: flex; gap: 10px; padding: 8px 0; }
 .color-swatch { width: 23px; height: 23px; border-radius: 50%; border: 2px solid transparent; background: var(--model-color); }
 .color-swatch.picked { outline: 2px solid var(--text); outline-offset: 3px; }
+[data-visual="minimal"] .app-shell { background: var(--bg); }
 [data-visual="minimal"] .model-chip.active { background: var(--model-color); color: var(--model-ink); border-color: transparent; opacity: 1; }
 [data-visual="minimal"] .model-chip.active:hover { color: var(--model-ink); }
 [data-visual="minimal"] .context-line { background: var(--model-color); color: var(--model-ink); padding: 9px 11px; border-radius: 5px; }
 [data-visual="minimal"] .context-line .context-description { color: color-mix(in srgb, var(--model-ink), transparent 28%); }
+[data-visual="minimal"] .capture-form { border-bottom-color: var(--model-color); }
 [data-visual="minimal"] .save-button { background: var(--model-color); color: var(--model-ink); }
+[data-theme="dark"][data-visual="minimal"] .context-line { background: transparent; color: var(--text); border: 1px solid color-mix(in srgb, var(--model-color), transparent 55%); border-left: 3px solid var(--model-color); }
+[data-theme="dark"][data-visual="minimal"] .context-line .context-description { color: var(--muted); }
+[data-theme="dark"][data-visual="minimal"] .model-chip.active { background: color-mix(in srgb, var(--model-color), transparent 82%); color: var(--model-color); border-color: color-mix(in srgb, var(--model-color), transparent 35%); }
+[data-theme="dark"][data-visual="minimal"] .save-button { background: color-mix(in srgb, var(--model-color), transparent 78%); color: var(--text); }
 fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
 legend { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
@@ -124,5 +140,6 @@ legend { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 @keyframes drift { to { transform: translate(8vw, 3vw) rotate(-15deg); } }
 [data-theme="dark"] { --bg: #171815; --panel: #1d1f1b; --text: #eeeee8; --muted: #898b82; --line: #30332e; --soft: #252823; color-scheme: dark; }
 @media (prefers-color-scheme: dark) { [data-theme="system"] { --bg: #171815; --panel: #1d1f1b; --text: #eeeee8; --muted: #898b82; --line: #30332e; --soft: #252823; color-scheme: dark; } }
+@media (prefers-color-scheme: dark) { [data-theme="system"][data-visual="minimal"] .context-line { background: transparent; color: var(--text); border: 1px solid color-mix(in srgb, var(--model-color), transparent 55%); border-left: 3px solid var(--model-color); } [data-theme="system"][data-visual="minimal"] .context-line .context-description { color: var(--muted); } [data-theme="system"][data-visual="minimal"] .model-chip.active { background: color-mix(in srgb, var(--model-color), transparent 82%); color: var(--model-color); border-color: color-mix(in srgb, var(--model-color), transparent 35%); } [data-theme="system"][data-visual="minimal"] .save-button { background: color-mix(in srgb, var(--model-color), transparent 78%); color: var(--text); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } [data-visual="ambient"] .ambient-lines { opacity: .04; } }
 @media (max-width: 600px) { input, textarea, select, button { font-size: 16px; } .topbar { padding: 0 16px; gap: 14px; } .content-column { padding: 48px 16px 70px; } .context-description { display: none; } .note-row { grid-template-columns: 24px 1fr; } .note-row time { display: none; } .view-heading { align-items: start; gap: 15px; flex-direction: column; margin-bottom: 30px; } .overlay { align-items: end; } .editor-panel { height: 94%; border-radius: 12px 12px 0 0; padding: 20px 16px 28px; } }
