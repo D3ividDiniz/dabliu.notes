@@ -36,7 +36,17 @@ If the user's text contains multiple tasks, reminders, requests, or distinct act
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
     });
-    if (!response.ok) throw new Error(`Gemini request failed: ${response.status}`);
+    if (!response.ok) {
+      const providerBody = await response.text();
+      let providerMessage = "";
+      try {
+        const parsed = JSON.parse(providerBody) as { error?: { message?: string } };
+        providerMessage = parsed.error?.message ?? "";
+      } catch {
+        providerMessage = "";
+      }
+      throw new Error(`Gemini request failed: ${response.status}${providerMessage ? ` — ${providerMessage}` : ""}`);
+    }
     const body = await response.json();
     const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string") throw new Error("Gemini returned no text");

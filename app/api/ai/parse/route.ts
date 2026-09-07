@@ -14,7 +14,15 @@ export async function POST(request: Request) {
     console.info(`[ai] parse success tasks=${parsed.notes.length} tokens=${parsed.usage?.totalTokenCount ?? "unknown"}`);
     return NextResponse.json(parsed);
   } catch (error) {
-    console.error("[ai] parse failed", error instanceof Error ? error.message : "unknown error");
-    return NextResponse.json({ error: "Unable to interpret note" }, { status: 422 });
+    const detail = error instanceof Error ? error.message : "unknown error";
+    console.error("[ai] parse failed", detail);
+    const userMessage = detail.includes("401")
+      ? "A chave da API Gemini está inválida ou expirada. Atualize GEMINI_API_KEY no Render."
+      : detail.includes("404")
+        ? "O modelo Gemini selecionado não está disponível. Escolha outro modelo em Configurações."
+        : detail.includes("429")
+          ? "O limite da API Gemini foi atingido. Tente novamente em alguns instantes."
+          : "Não foi possível interpretar a captura agora. A nota original foi salva e pode ser processada novamente.";
+    return NextResponse.json({ error: userMessage }, { status: 422 });
   }
 }

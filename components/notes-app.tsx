@@ -169,7 +169,8 @@ export default function NotesApp() {
     const timeout = window.setTimeout(() => controller.abort(), 45000);
     log(`enviando para Gemini (${aiModel})`);
     fetch("/api/ai/parse", { method: "POST", signal: controller.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ modelName: activeModel.name, context: activeModel.description ?? "", fields: activeModel.enabled_fields, content, aiModel }) }).then(async (response) => {
-      if (!response.ok) throw new Error(`Gemini respondeu HTTP ${response.status}`); const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? `Gemini respondeu HTTP ${response.status}`);
       const parsedNotes = Array.isArray(result) ? result : Array.isArray(result.notes) ? result.notes : [result];
       const usage = Array.isArray(result) ? null : result.usage ?? null;
       log(`Gemini respondeu com ${parsedNotes.length} tarefa(s)`);
