@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const next = requestUrl.searchParams.get("next")?.startsWith("/") ? requestUrl.searchParams.get("next")! : "/";
   // Keep the OAuth session on the exact host that received the callback.
   // Render may forward an internal/default host in x-forwarded-host.
-  const origin = requestUrl.origin;
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || requestUrl.origin;
   const hasVerifier = request.cookies.getAll().some(({ name }) => name.includes("code-verifier"));
   console.info(`[auth] callback host=${requestUrl.host} code=${Boolean(code)} pkce_verifier=${hasVerifier}`);
   const response = NextResponse.redirect(`${origin}${next}`);

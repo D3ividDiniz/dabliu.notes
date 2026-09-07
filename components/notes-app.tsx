@@ -153,7 +153,8 @@ export default function NotesApp() {
   async function signInWithGoogle() {
     if (!supabase) return setMessage("Add Supabase environment variables to enable sign in.");
     await supabase.auth.signOut({ scope: "local" });
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth/callback?next=/`, queryParams: { prompt: "select_account" } } });
+    const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, "");
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${appOrigin}/auth/callback?next=/`, queryParams: { prompt: "select_account" } } });
     if (error) setMessage(error.message);
   }
 
