@@ -32,13 +32,23 @@ h2 { font-size: 13px; font-weight: 500; }
 .context-line { color: var(--text); font-size: 12px; letter-spacing: .01em; display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
 .context-description { color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--model-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--model-color), transparent 82%); }
+.capture-mode { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; margin-bottom: 10px; }
+.mode-toggle { border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 5px 8px 5px 7px; display: inline-flex; align-items: center; gap: 6px; font-size: 10px; }
+.mode-toggle:hover, .mode-toggle.active { color: var(--model-ink); background: var(--model-color); border-color: var(--model-color); }
+.toggle-knob { width: 14px; height: 14px; border-radius: 50%; background: currentColor; opacity: .35; transition: transform .18s ease, opacity .18s ease; }
+.mode-toggle.active .toggle-knob { opacity: 1; transform: translateX(2px); background: var(--model-ink); }
 .capture-form { border-bottom: 1px solid var(--line); padding-bottom: 11px; }
+.ai-capture-form { border-bottom-color: var(--model-color); }
 .capture-form textarea { border: 0; background: transparent; padding: 0; font-size: clamp(19px, 3vw, 24px); line-height: 1.55; min-height: 115px; border-radius: 0; letter-spacing: -.04em; }
 .capture-form textarea::placeholder { color: var(--muted); opacity: .75; }
 .capture-form textarea:focus { outline: 0; }
 .capture-hint { color: var(--muted); font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
 .debug-log { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--line); color: var(--muted); font-size: 10px; line-height: 1.7; background: color-mix(in srgb, var(--panel), transparent 35%); }
 .debug-label { display: block; color: var(--model-color); font-size: 9px; letter-spacing: .12em; margin-bottom: 3px; }
+.ai-answer { margin-top: 18px; padding: 14px; border-left: 3px solid var(--model-color); background: color-mix(in srgb, var(--panel), var(--model-color) 6%); }
+.ai-answer-heading { display: flex; align-items: center; gap: 7px; color: var(--model-color); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+.ai-answer-heading .text-button { margin-left: auto; text-transform: none; letter-spacing: normal; }
+.ai-answer p { white-space: pre-wrap; color: var(--text); font-size: 13px; line-height: 1.7; margin-top: 11px; }
 .save-button, .primary-button, .google-button { border: 0; border-radius: 5px; background: var(--text); color: var(--bg); padding: 9px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .save-button { padding: 6px 9px; background: transparent; color: var(--text); }
 .save-button:hover { background: var(--soft); }

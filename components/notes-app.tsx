@@ -95,6 +95,9 @@ export default function NotesApp() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiMode, setAIMode] = useState(false);
+  const [aiAnswer, setAIAnswer] = useState("");
+  const [askingAI, setAskingAI] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -188,6 +191,22 @@ export default function NotesApp() {
     }).catch(async (error: unknown) => { const detail = error instanceof DOMException && error.name === "AbortError" ? "timeout após 45s" : error instanceof Error ? error.message : "erro desconhecido"; await supabase.from("notes").update({ ai_status: "failed" }).eq("id", note.id); setNotes((current) => [{ ...note, ai_status: "failed" }, ...current]); log(`falha: ${detail}`); setMessage(`Texto salvo, mas a IA falhou: ${detail}.`); }).finally(() => { window.clearTimeout(timeout); setSaving(false); });
   }
 
+  async function askAI(question: string) {
+    if (!question.trim() || !supabase || !user) return;
+    setAskingAI(true); setMessage(""); setAIAnswer("");
+    try {
+      const response = await fetch("/api/ai/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: question.trim(), aiModel }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? `IA respondeu HTTP ${response.status}`);
+      setAIAnswer(result.answer ?? "A IA não encontrou uma resposta.");
+      if (inputRef.current) inputRef.current.value = "";
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível perguntar à IA agora.");
+    } finally {
+      setAskingAI(false);
+    }
+  }
+
   async function saveModel(form: NoteModel) {
     if (!supabase || !user) return;
     const payload = { name: form.name, icon: form.icon, color: form.color, description: form.description, enabled_fields: form.enabled_fields, organization_mode: form.organization_mode, placeholders: form.placeholders.filter(Boolean).slice(0, 5), visual_style: form.visual_style };
@@ -252,10 +271,12 @@ export default function NotesApp() {
       {view === "capture" && <>
         <div className="context-line"><span className={`status-dot color-${activeModel?.color ?? "gray"}`} /> {activeModel?.name ?? "Crie seu primeiro módulo"}<span className="context-description">{activeModel?.description ?? "Um lugar tranquilo para suas ideias."}</span></div>
         {!activeModel ? <EmptyModels onCreate={() => setShowModelEditor(true)} /> : <>
-          <form className="capture-form" onSubmit={(event) => { event.preventDefault(); void capture(inputRef.current?.value ?? ""); }}>
-            <textarea ref={inputRef} autoFocus rows={5} placeholder={activeModel.placeholders?.[0] ?? DEFAULT_PLACEHOLDERS[0]} aria-label={`Capture notes in ${activeModel.name}`} />
-            <div className="capture-hint"><span>Enter cria uma nova linha</span><button className="save-button" disabled={saving} type="submit">{saving ? "Interpretando..." : "Salvar"}<span>↵</span></button></div>
+          <div className="capture-mode"><span>Modo de captura</span><button type="button" className={`mode-toggle ${aiMode ? "active" : ""}`} role="switch" aria-checked={aiMode} onClick={() => { setAIMode((current) => !current); setAIAnswer(""); setMessage(""); }}><Sparkles size={14} /> {aiMode ? "IA ativa" : "Modo IA"}<span className="toggle-knob" /></button></div>
+          <form className={`capture-form ${aiMode ? "ai-capture-form" : ""}`} onSubmit={(event) => { event.preventDefault(); const content = inputRef.current?.value ?? ""; void (aiMode ? askAI(content) : capture(content)); }}>
+            <textarea ref={inputRef} autoFocus rows={5} placeholder={aiMode ? "Pergunte sobre suas tarefas..." : activeModel.placeholders?.[0] ?? DEFAULT_PLACEHOLDERS[0]} aria-label={aiMode ? "Pergunte à IA sobre suas tarefas" : `Capture notes in ${activeModel.name}`} />
+            <div className="capture-hint"><span>{aiMode ? "A IA consulta suas tarefas e módulos" : "Enter cria uma nova linha"}</span><button className="save-button" disabled={saving || askingAI} type="submit">{askingAI ? "Pensando..." : aiMode ? "Perguntar" : saving ? "Interpretando..." : "Salvar"}<span>↵</span></button></div>
           </form>
+          {aiAnswer && <section className="ai-answer" aria-live="polite"><div className="ai-answer-heading"><Sparkles size={14} /><span>Resposta da IA</span><button type="button" className="text-button" onClick={() => setAIAnswer("")}>Limpar</button></div><p>{aiAnswer}</p></section>}
           {debugLog.length > 0 && <div className="debug-log" aria-live="polite"><span className="debug-label">DEV / IA</span>{debugLog.map((entry, index) => <div key={`${entry}-${index}`}>{entry}</div>)}</div>}
           <NoteFeed notes={visibleNotes.slice(0, 12)} models={models} swipeBehavior={swipeBehavior} onArchive={archiveNote} onDelete={deleteNote} onSelect={setSelectedNote} />
         </>}
