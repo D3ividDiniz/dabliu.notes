@@ -139,6 +139,11 @@ export default function NotesApp() {
     window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  useEffect(() => {
+    const authError = new URLSearchParams(window.location.search).get("auth_error");
+    if (authError) setMessage(`Falha no login Google: ${authError}. Tente novamente em uma aba privada.`);
+  }, []);
+
   async function signIn(event: React.FormEvent) {
     event.preventDefault(); if (!supabase) return setMessage("Add Supabase environment variables to enable sign in.");
     setMessage(""); const result = authMode === "signin" ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password });

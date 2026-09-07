@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
   // Keep the OAuth session on the exact host that received the callback.
   // Render may forward an internal/default host in x-forwarded-host.
   const origin = requestUrl.origin;
+  const hasVerifier = request.cookies.getAll().some(({ name }) => name.includes("code-verifier"));
+  console.info(`[auth] callback host=${requestUrl.host} code=${Boolean(code)} pkce_verifier=${hasVerifier}`);
   const response = NextResponse.redirect(`${origin}${next}`);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,6 +24,9 @@ export async function GET(request: NextRequest) {
   });
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
+  if (error) {
+    console.error(`[auth] exchange failed: ${error.message}`);
+    return NextResponse.redirect(`${origin}/?auth_error=exchange_failed`);
+  }
   return response;
 }
