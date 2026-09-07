@@ -5,8 +5,9 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next")?.startsWith("/") ? requestUrl.searchParams.get("next")! : "/";
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const origin = process.env.NODE_ENV === "development" || !forwardedHost ? requestUrl.origin : `https://${forwardedHost}`;
+  // Keep the OAuth session on the exact host that received the callback.
+  // Render may forward an internal/default host in x-forwarded-host.
+  const origin = requestUrl.origin;
   const response = NextResponse.redirect(`${origin}${next}`);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
