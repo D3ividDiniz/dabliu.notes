@@ -29,6 +29,7 @@ create table if not exists public.notes (
   status text check (status in ('pending', 'in_progress', 'completed')),
   ai_metadata jsonb not null default '{}'::jsonb,
   ai_status text not null default 'not_requested' check (ai_status in ('not_requested','pending','complete','failed')),
+  archived_at timestamptz,
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -38,6 +39,7 @@ create table if not exists public.user_preferences (
   user_id uuid primary key references auth.users(id) on delete cascade,
   theme text not null default 'system' check (theme in ('system', 'light', 'dark')),
   visual_style text not null default 'minimal' check (visual_style in ('minimal', 'ambient')),
+  swipe_behavior text not null default 'archive' check (swipe_behavior in ('archive', 'reveal_delete')),
   ai_model text not null default 'gemini-3.6-flash',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

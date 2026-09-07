@@ -28,7 +28,7 @@ Model: ${input.modelName}
 Context: ${input.context || "none"}
 Enabled fields: ${input.fields.join(", ")}
 User note: ${input.content}
-If the user's text contains multiple tasks, reminders, requests, or distinct actions, split them into separate notes. Return at most 20 notes in this exact shape: {"notes":[{"title":"...","description":"...","date":null,"tags":[],"value":null,"number":null,"status":"pending"}]}. Preserve the meaning of each task. Use null for unavailable values and [] for no tags. Date should be ISO when possible.`;
+If the user's text contains multiple tasks, reminders, requests, or distinct actions, split them into separate notes. Return at most 20 notes in this exact shape: {"notes":[{"title":"...","description":"...","date":null,"tags":[],"value":null,"number":null,"status":"pending"}]}. Preserve the meaning of each task. Use null for unavailable values and [] for no tags. Date must be YYYY-MM-DD only; use null when an exact date cannot be inferred (never return words such as tomorrow or next week).`;
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "content-type": "application/json" },

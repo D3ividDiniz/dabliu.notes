@@ -4,6 +4,7 @@ export type VisualStyle = "minimal" | "ambient";
 export type OrganizationMode = "list" | "date" | "tags";
 export type FieldKey = "title" | "description" | "date" | "tag" | "value" | "number" | "status";
 export type ThemeMode = "system" | "light" | "dark";
+export type SwipeBehavior = "archive" | "reveal_delete";
 
 export type NoteModel = {
   id: string;
@@ -34,6 +35,7 @@ export type Note = {
   status: "pending" | "in_progress" | "completed" | null;
   ai_metadata: Record<string, unknown>;
   ai_status: "not_requested" | "pending" | "complete" | "failed";
+  archived_at: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
