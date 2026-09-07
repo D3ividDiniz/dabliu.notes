@@ -21,7 +21,9 @@ export async function POST(request: Request) {
       : detail.includes("404")
         ? "O modelo Gemini selecionado não está disponível. Escolha outro modelo em Configurações."
         : detail.includes("429")
-          ? "O limite da API Gemini foi atingido. Tente novamente em alguns instantes."
+          ? "Os modelos Gemini estão temporariamente ocupados ou o limite foi atingido. Tente novamente em alguns instantes."
+          : detail.includes("503")
+            ? "Os modelos Gemini estão temporariamente com alta demanda. Tente novamente em alguns instantes."
           : "Não foi possível interpretar a captura agora. A nota original foi salva e pode ser processada novamente.";
     return NextResponse.json({ error: userMessage }, { status: 422 });
   }

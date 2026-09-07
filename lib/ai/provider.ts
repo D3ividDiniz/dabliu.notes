@@ -31,12 +31,16 @@ Context: ${input.context || "none"}
 Enabled fields: ${input.fields.join(", ")}
 User note: ${input.content}
 If the user's text contains multiple tasks, reminders, requests, or distinct actions, split them into separate notes. Return at most 20 notes in this exact shape: {"notes":[{"title":"...","description":"...","date":null,"tags":[],"value":null,"number":null,"status":"pending"}]}. Preserve the meaning of each task. Use null for unavailable values and [] for no tags. Date must be YYYY-MM-DD only; use null when an exact date cannot be inferred (never return words such as tomorrow or next week).`;
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
-    });
-    if (!response.ok) {
+    const fallbackModels = [model, "gemini-3.7-flash", "gemini-3.5-flash"];
+    let response: Response | null = null;
+    let lastError = "";
+    for (const candidate of [...new Set(fallbackModels)]) {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
+      });
+      if (response.ok) break;
       const providerBody = await response.text();
       let providerMessage = "";
       try {
@@ -45,8 +49,10 @@ If the user's text contains multiple tasks, reminders, requests, or distinct act
       } catch {
         providerMessage = "";
       }
-      throw new Error(`Gemini request failed: ${response.status}${providerMessage ? ` — ${providerMessage}` : ""}`);
+      lastError = `Gemini request failed: ${response.status}${providerMessage ? ` — ${providerMessage}` : ""}`;
+      if (response.status !== 429 && response.status !== 503) throw new Error(lastError);
     }
+    if (!response?.ok) throw new Error(lastError || "Gemini request failed");
     const body = await response.json();
     const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string") throw new Error("Gemini returned no text");
