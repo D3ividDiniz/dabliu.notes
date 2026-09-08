@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GEMINI_TEXT_MODELS } from "@/lib/ai/models";
 
 export const parsedNoteSchema = z.object({
   title: z.string().nullable().default(null),
@@ -20,29 +21,39 @@ export interface AIProvider {
   answerQuestion(input: { question: string; context: string; aiModel?: string }): Promise<AIQuestionResult>;
 }
 
-const allowedModels = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"];
-
 async function requestGemini(apiKey: string, requestedModel: string | undefined, body: Record<string, unknown>) {
-  const model = requestedModel && allowedModels.includes(requestedModel) ? requestedModel : process.env.GEMINI_MODEL || "gemini-3.6-flash";
-  const fallbackModels = [model, "gemini-3.7-flash", "gemini-3.5-flash"];
+  const preferredModel = requestedModel && GEMINI_TEXT_MODELS.includes(requestedModel as (typeof GEMINI_TEXT_MODELS)[number]) ? requestedModel : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const preferredIndex = GEMINI_TEXT_MODELS.indexOf(preferredModel as (typeof GEMINI_TEXT_MODELS)[number]);
+  const fallbackModels = preferredIndex >= 0
+    ? [...GEMINI_TEXT_MODELS.slice(preferredIndex), ...GEMINI_TEXT_MODELS.slice(0, preferredIndex)]
+    : [preferredModel, ...GEMINI_TEXT_MODELS];
   let lastError = "";
   for (const candidate of [...new Set(fallbackModels)]) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (response.ok) return response.json();
-    const providerBody = await response.text();
-    let providerMessage = "";
     try {
-      const parsed = JSON.parse(providerBody) as { error?: { message?: string } };
-      providerMessage = parsed.error?.message ?? "";
-    } catch {
-      providerMessage = "";
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok) {
+        if (candidate !== preferredModel) console.warn(`[ai] fallback model used: ${candidate}`);
+        return response.json();
+      }
+      const providerBody = await response.text();
+      let providerMessage = "";
+      try {
+        const parsed = JSON.parse(providerBody) as { error?: { message?: string } };
+        providerMessage = parsed.error?.message ?? "";
+      } catch {
+        providerMessage = "";
+      }
+      lastError = `Gemini request failed: ${response.status}${providerMessage ? ` — ${providerMessage}` : ""}`;
+      if (response.status === 401 || response.status === 403) throw new Error(lastError);
+    } catch (error) {
+      if (error instanceof Error && /Gemini request failed: (401|403)/.test(error.message)) throw error;
+      lastError = error instanceof Error && error.name === "TimeoutError" ? "Gemini request failed: timeout" : error instanceof Error ? error.message : "Gemini request failed";
     }
-    lastError = `Gemini request failed: ${response.status}${providerMessage ? ` — ${providerMessage}` : ""}`;
-    if (response.status !== 429 && response.status !== 503) throw new Error(lastError);
   }
   throw new Error(lastError || "Gemini request failed");
 }
