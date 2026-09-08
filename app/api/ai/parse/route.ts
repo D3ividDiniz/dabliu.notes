@@ -4,7 +4,7 @@ import { getAIProvider } from "@/lib/ai/provider";
 export async function POST(request: Request) {
   const provider = getAIProvider();
   if (!provider) {
-    console.warn("[ai] provider unavailable: configure GEMINI_API_KEY or OPENROUTER_API_KEY");
+    console.warn("[ai] provider unavailable: configure GEMINI_API_KEY or OPENROUTER_API_KEY/OPEN_ROUTER_API_KEY");
     return NextResponse.json({ error: "AI is not configured" }, { status: 503 });
   }
   try {

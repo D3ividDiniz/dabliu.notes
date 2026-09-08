@@ -141,7 +141,7 @@ Pergunta: ${input.question}`;
 
 export class OpenRouterProvider implements AIProvider {
   private getApiKey() {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPEN_ROUTER_API_KEY;
     if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
     return apiKey;
   }
@@ -202,7 +202,7 @@ class FallbackAIProvider implements AIProvider {
 
 export function getAIProvider(): AIProvider | null {
   const gemini = process.env.GEMINI_API_KEY ? new GeminiProvider() : null;
-  const openRouter = process.env.OPENROUTER_API_KEY ? new OpenRouterProvider() : null;
+  const openRouter = process.env.OPENROUTER_API_KEY || process.env.OPEN_ROUTER_API_KEY ? new OpenRouterProvider() : null;
   const providers = process.env.AI_PROVIDER === "openrouter" ? [openRouter, gemini] : [gemini, openRouter];
   const available = providers.filter((provider): provider is AIProvider => provider !== null);
   return available.length ? new FallbackAIProvider(available) : null;
